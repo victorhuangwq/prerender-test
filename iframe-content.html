@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iframe Content - Prerender Detection</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: #fafbfc;
+            color: #24292e;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 16px 0;
+        }
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0 12px 0;
+        }
+        .status-box {
+            background-color: #fff8f0;
+            border: 1px solid #e1e4e8;
+            border-left: 4px solid #ffa500;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+        .status-box.active {
+            background-color: #f0f8f0;
+            border-left-color: #28a745;
+        }
+        .info-section {
+            background-color: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .info-row {
+            margin: 8px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-row strong {
+            display: inline-block;
+            width: 140px;
+            color: #24292e;
+        }
+        code {
+            background-color: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+        }
+        ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        li {
+            margin: 4px 0;
+        }
+        .log {
+            background-color: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .log-entry {
+            margin: 4px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .timestamp {
+            color: #6f42c1;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Iframe Content Page</h1>
+
+        <div id="statusBox" class="status-box">
+            <span id="statusText">Checking prerender state...</span>
+        </div>
+
+        <div class="info-section">
+            <div class="info-row">
+                <strong>Location:</strong> <span id="locationInfo"></span>
+            </div>
+            <div class="info-row">
+                <strong>Origin:</strong> <span id="originInfo"></span>
+            </div>
+            <div class="info-row">
+                <strong>Visibility:</strong> <span id="visibilityInfo"></span>
+            </div>
+            <div class="info-row">
+                <strong>Prerendering:</strong> <code id="prerenderingValue">checking...</code>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>Prerender Detection Methods</h3>
+            <ul>
+                <li><code>document.prerendering</code> - Direct API check</li>
+                <li><code>document.visibilityState</code> - Should be 'hidden' during prerender</li>
+                <li><code>prerenderingchange</code> event - Fires on activation</li>
+                <li>Performance API - <code>activationStart</code> timing</li>
+            </ul>
+        </div>
+
+        <div class="info-section">
+            <h3>Event Log</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        const statusBox = document.getElementById('statusBox');
+        const statusText = document.getElementById('statusText');
+        const locationInfo = document.getElementById('locationInfo');
+        const originInfo = document.getElementById('originInfo');
+        const visibilityInfo = document.getElementById('visibilityInfo');
+        const prerenderingValue = document.getElementById('prerenderingValue');
+
+        let wasPrerendered = false;
+        const loadTime = performance.now();
+
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const timestamp = new Date().toLocaleTimeString();
+            const elapsed = (performance.now() - loadTime).toFixed(2);
+            entry.innerHTML = `<span class="timestamp">[${timestamp}] +${elapsed}ms</span>${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[Iframe] ${message}`);
+        }
+
+        function updateStatus() {
+            locationInfo.textContent = window.location.href;
+            originInfo.textContent = window.location.origin;
+            visibilityInfo.textContent = document.visibilityState;
+            prerenderingValue.textContent = String(document.prerendering);
+
+            if (document.prerendering) {
+                wasPrerendered = true;
+                statusBox.classList.remove('active');
+                statusText.textContent = 'PRERENDERING - This iframe content is being prerendered';
+                addLog('Iframe is in PRERENDERING state');
+            } else {
+                statusBox.classList.add('active');
+                if (wasPrerendered) {
+                    statusText.textContent = 'ACTIVE - This iframe was prerendered and is now active';
+                } else {
+                    statusText.textContent = 'ACTIVE - This iframe loaded normally (not prerendered)';
+                }
+            }
+        }
+
+        // Initial log
+        addLog('Iframe content script started');
+        addLog(`URL: ${window.location.href}`);
+        addLog(`Origin: ${window.location.origin}`);
+        addLog(`Initial visibility: ${document.visibilityState}`);
+        addLog(`Initial document.prerendering: ${document.prerendering}`);
+
+        // Check if we're in an iframe
+        if (window.self !== window.top) {
+            addLog('Running inside an iframe');
+
+            try {
+                addLog(`Parent origin: ${window.parent.location.origin}`);
+            } catch (e) {
+                addLog('Parent is cross-origin (SecurityError - expected)');
+            }
+        } else {
+            addLog('Running as top-level page');
+        }
+
+        updateStatus();
+
+        // Listen for prerendering activation
+        document.addEventListener('prerenderingchange', () => {
+            addLog('prerenderingchange EVENT FIRED');
+            addLog('Iframe is being activated from prerendering');
+            updateStatus();
+
+            const navEntry = performance.getEntriesByType('navigation')[0];
+            if (navEntry && navEntry.activationStart) {
+                addLog(`activationStart: ${navEntry.activationStart}ms`);
+            }
+        });
+
+        // Listen for visibility changes
+        document.addEventListener('visibilitychange', () => {
+            addLog(`Visibility changed: ${document.visibilityState}`);
+            visibilityInfo.textContent = document.visibilityState;
+        });
+
+        // Check on page load
+        window.addEventListener('load', () => {
+            addLog('Iframe content fully loaded');
+
+            const navEntry = performance.getEntriesByType('navigation')[0];
+            if (navEntry) {
+                addLog(`Navigation type: ${navEntry.type}`);
+
+                if (navEntry.activationStart) {
+                    addLog(`activationStart: ${navEntry.activationStart}ms (WAS PRERENDERED)`);
+                    addLog('This confirms the iframe was prerendered');
+                } else {
+                    addLog(`activationStart: 0 (not prerendered)`);
+                }
+            }
+
+            updateStatus();
+
+            if (wasPrerendered) {
+                addLog('SUMMARY: This iframe experienced prerendering');
+            } else {
+                addLog('SUMMARY: This iframe did not experience prerendering');
+            }
+        });
+
+        // Periodic status check
+        let checkCount = 0;
+        const statusChecker = setInterval(() => {
+            checkCount++;
+            if (checkCount > 20) {
+                clearInterval(statusChecker);
+                return;
+            }
+
+            const currentPrerendering = document.prerendering;
+            if (currentPrerendering !== wasPrerendered) {
+                addLog(`Prerendering state changed at check #${checkCount}`);
+                updateStatus();
+            }
+        }, 500);
+    </script>
+</body>
+</html>

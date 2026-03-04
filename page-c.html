@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page C - Nested Cross-Site Iframe</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: #fafbfc;
+            color: #24292e;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 16px 0;
+            color: #24292e;
+        }
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0 12px 0;
+        }
+        .status-box {
+            background-color: #fff8f0;
+            border: 1px solid #e1e4e8;
+            border-left: 4px solid #ffa500;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+        .status-box.active {
+            background-color: #f0f8f0;
+            border-left-color: #28a745;
+        }
+        .info-section {
+            background-color: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .info-row {
+            margin: 8px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-row strong {
+            display: inline-block;
+            width: 160px;
+            color: #24292e;
+        }
+        code {
+            background-color: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12px;
+        }
+        iframe {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #0366d6;
+            border-radius: 6px;
+            margin: 12px 0;
+        }
+        .nested-label {
+            display: inline-block;
+            background-color: #0366d6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .log {
+            background-color: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+        .log-entry {
+            margin: 4px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        .timestamp {
+            color: #6f42c1;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Page C - Nested Cross-Site Iframe</h1>
+
+        <div id="statusBox" class="status-box">
+            <span id="statusText">Checking prerender state...</span>
+        </div>
+
+        <div class="info-section">
+            <div class="info-row">
+                <strong>Location:</strong> <span id="locationInfo"></span>
+            </div>
+            <div class="info-row">
+                <strong>Origin:</strong> <span id="originInfo"></span>
+            </div>
+            <div class="info-row">
+                <strong>Nesting Level:</strong> <span>Level 1 (embedded in Page B)</span>
+            </div>
+            <div class="info-row">
+                <strong>Visibility:</strong> <span id="visibilityInfo"></span>
+            </div>
+            <div class="info-row">
+                <strong>Prerendering:</strong> <code id="prerenderingValue">checking...</code>
+            </div>
+            <div class="info-row">
+                <strong>Header Sent:</strong> <code>Supports-Loading-Mode: prerender-cross-origin-frames</code>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h3>Nested Iframe (Level 2)</h3>
+            <span class="nested-label">NESTED IFRAME</span>
+            <p>This iframe embeds content from <code>site-b.example:8081</code> (a third site), creating a nested cross-site iframe chain:</p>
+            <p><code>Page B (site-a.test:8080) → Page C (site-c.localhost:8082) → Iframe Content (site-b.example:8081)</code></p>
+            <p><strong>Nested Iframe Status:</strong> <span id="nestedIframeStatus">Not loaded</span></p>
+            <iframe id="nestedIframe" src="http://site-b.example:8081/iframe-content.html" title="Nested iframe content"></iframe>
+        </div>
+
+        <div class="info-section">
+            <h3>Event Log</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        const statusBox = document.getElementById('statusBox');
+        const statusText = document.getElementById('statusText');
+        const locationInfo = document.getElementById('locationInfo');
+        const originInfo = document.getElementById('originInfo');
+        const visibilityInfo = document.getElementById('visibilityInfo');
+        const prerenderingValue = document.getElementById('prerenderingValue');
+        const nestedIframe = document.getElementById('nestedIframe');
+        const nestedIframeStatus = document.getElementById('nestedIframeStatus');
+
+        let wasPrerendered = false;
+        const loadTime = performance.now();
+        let nestedIframeLoadStart = performance.now();
+        let nestedIframeLoadedDuringPrerender = false;
+
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const timestamp = new Date().toLocaleTimeString();
+            const elapsed = (performance.now() - loadTime).toFixed(2);
+            entry.innerHTML = `<span class="timestamp">[${timestamp}] +${elapsed}ms</span>${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[Page C] ${message}`);
+        }
+
+        function updateStatus() {
+            locationInfo.textContent = window.location.href;
+            originInfo.textContent = window.location.origin;
+            visibilityInfo.textContent = document.visibilityState;
+            prerenderingValue.textContent = String(document.prerendering);
+
+            if (document.prerendering) {
+                wasPrerendered = true;
+                statusBox.classList.remove('active');
+                statusText.textContent = 'PRERENDERING - Page C is being prerendered (nested in Page B)';
+                addLog('Page C is in PRERENDERING state');
+            } else {
+                statusBox.classList.add('active');
+                if (wasPrerendered) {
+                    statusText.textContent = 'ACTIVE - Page C was prerendered and is now active';
+                } else {
+                    statusText.textContent = 'ACTIVE - Page C loaded normally (not prerendered)';
+                }
+            }
+        }
+
+        // Nested iframe load tracking
+        nestedIframe.addEventListener('load', () => {
+            const loadTimeStr = new Date().toLocaleTimeString();
+            const elapsed = (performance.now() - nestedIframeLoadStart).toFixed(2);
+            addLog(`Nested iframe loaded at ${loadTimeStr} (${elapsed}ms)`);
+
+            if (document.prerendering) {
+                addLog('Nested iframe loaded DURING prerendering (nested prerendering working!)');
+                nestedIframeLoadedDuringPrerender = true;
+                nestedIframeStatus.textContent = `Loaded during prerendering at ${loadTimeStr}`;
+            } else {
+                if (nestedIframeLoadedDuringPrerender) {
+                    addLog('Nested iframe was already loaded during prerendering');
+                    nestedIframeStatus.textContent = 'Preloaded, now active';
+                } else {
+                    addLog('Nested iframe loaded AFTER activation');
+                    nestedIframeStatus.textContent = `Loaded after activation at ${loadTimeStr}`;
+                }
+            }
+
+            try {
+                if (nestedIframe.contentWindow && nestedIframe.contentWindow.document) {
+                    const nestedPrerendering = nestedIframe.contentWindow.document.prerendering;
+                    addLog(`Nested iframe's document.prerendering = ${nestedPrerendering}`);
+                }
+            } catch (e) {
+                addLog('Cannot access nested iframe content (cross-origin)');
+            }
+        });
+
+        nestedIframe.addEventListener('error', (e) => {
+            addLog(`Nested iframe loading error: ${e.message || 'Unknown error'}`);
+            nestedIframeStatus.textContent = 'Error loading nested iframe';
+        });
+
+        // Initial log
+        addLog('Page C script started');
+        addLog(`URL: ${window.location.href}`);
+        addLog(`Origin: ${window.location.origin}`);
+        addLog(`Initial visibility: ${document.visibilityState}`);
+        addLog(`Initial document.prerendering: ${document.prerendering}`);
+
+        // Check nesting
+        if (window.self !== window.top) {
+            addLog('Running inside an iframe (expected - embedded in Page B)');
+            try {
+                addLog(`Parent origin: ${window.parent.location.origin}`);
+            } catch (e) {
+                addLog('Parent is cross-origin (SecurityError - expected)');
+            }
+
+            // Check depth
+            let depth = 0;
+            let currentWindow = window;
+            while (currentWindow !== currentWindow.top) {
+                depth++;
+                try {
+                    currentWindow = currentWindow.parent;
+                } catch (e) {
+                    break;
+                }
+            }
+            addLog(`Iframe nesting depth: ${depth}`);
+        } else {
+            addLog('Running as top-level page (not expected for nested test)');
+        }
+
+        updateStatus();
+
+        // Listen for prerendering activation
+        document.addEventListener('prerenderingchange', () => {
+            addLog('prerenderingchange EVENT FIRED on Page C');
+            addLog('Page C is being activated from prerendering');
+            updateStatus();
+
+            const navEntry = performance.getEntriesByType('navigation')[0];
+            if (navEntry && navEntry.activationStart) {
+                addLog(`activationStart: ${navEntry.activationStart}ms`);
+            }
+        });
+
+        // Listen for visibility changes
+        document.addEventListener('visibilitychange', () => {
+            addLog(`Visibility changed: ${document.visibilityState}`);
+            visibilityInfo.textContent = document.visibilityState;
+        });
+
+        // Check on page load
+        window.addEventListener('load', () => {
+            addLog('Page C fully loaded');
+
+            const navEntry = performance.getEntriesByType('navigation')[0];
+            if (navEntry) {
+                addLog(`Navigation type: ${navEntry.type}`);
+
+                if (navEntry.activationStart) {
+                    addLog(`activationStart: ${navEntry.activationStart}ms (WAS PRERENDERED)`);
+                    addLog('This confirms Page C was prerendered as a nested iframe');
+                } else {
+                    addLog('activationStart: 0 (not prerendered)');
+                }
+            }
+
+            updateStatus();
+
+            if (wasPrerendered) {
+                addLog('SUMMARY: Page C experienced prerendering (nested cross-site prerendering works!)');
+            } else {
+                addLog('SUMMARY: Page C did not experience prerendering');
+            }
+        });
+
+        // Periodic status check
+        let checkCount = 0;
+        const statusChecker = setInterval(() => {
+            checkCount++;
+            if (checkCount > 20) {
+                clearInterval(statusChecker);
+                return;
+            }
+
+            const currentPrerendering = document.prerendering;
+            if (currentPrerendering !== wasPrerendered) {
+                addLog(`Prerendering state changed at check #${checkCount}`);
+                updateStatus();
+            }
+        }, 500);
+    </script>
+</body>
+</html>

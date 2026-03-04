@@ -1,0 +1,21 @@
+{
+  "name": "prerender-test-server",
+  "version": "1.0.0",
+  "description": "Test server for cross-site iframe prerendering with Supports-Loading-Mode header",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "prerender",
+    "speculation-rules",
+    "cross-site",
+    "iframe"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
