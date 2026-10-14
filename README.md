@@ -15,7 +15,7 @@ Page A                  site-a.test:8080
 
 ## Setup
 
-1. In Chrome, enable `chrome://flags/#prerender2-cross-origin-iframes`. Add `http://site-a.test:8080,http://site-b.example:8081,http://site-c.localhost:8082` to `chrome://flags/#unsafely-treat-insecure-origin-as-secure` so the test origins count as secure. Prerendering requires a secure context.
+1. In Chrome, enable `chrome://flags/#prerender2-cross-origin-iframes`.
 2. Add these entries to your hosts file (`C:\Windows\System32\drivers\etc\hosts` or `/etc/hosts`):
 
    ```text
