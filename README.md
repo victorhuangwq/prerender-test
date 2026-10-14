@@ -1,6 +1,14 @@
 # Cross-site iframe prerendering test
 
-Tests [`Supports-Loading-Mode: prerender-cross-origin-frames`](https://github.com/WICG/nav-speculation/blob/main/prerendering-cross-origin-iframes.md), which lets a prerendered page load its cross-site iframes before activation instead of deferring them.
+- [Chrome Status](https://chromestatus.com/feature/5112398709129216)
+- Origin trial: [Chrome](https://developer.chrome.com/origintrials/#/register_trial/790944684556943361) (M147 to M152), [Edge](https://developer.microsoft.com/microsoft-edge/origin-trials/trials/46c24517-496a-4a6b-a4d3-604b08620d43)
+- [Explainer](https://github.com/WICG/nav-speculation/blob/main/prerendering-cross-origin-iframes.md)
+
+When a page is prerendered, its cross-site iframes normally don't load until the user navigates to it, so they're still loading after activation. With `Supports-Loading-Mode: prerender-cross-origin-frames`, a cross-site iframe can opt in to loading during prerendering instead.
+
+## What this demo shows
+
+A prerendered page with two levels of nested cross-site iframes, each opting in. You should see every frame load while still prerendering, then fire `prerenderingchange` on activation. Removing the opt-in header from a frame makes it, and everything under it, wait for activation instead.
 
 ## How it works
 
