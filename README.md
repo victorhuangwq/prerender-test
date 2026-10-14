@@ -1,4 +1,4 @@
-# Cross-Site Iframe Prerendering Test
+# Cross-site iframe prerendering test
 
 Tests [`Supports-Loading-Mode: prerender-cross-origin-frames`](https://github.com/WICG/nav-speculation/blob/main/prerendering-cross-origin-iframes.md), which lets a prerendered page load its cross-site iframes before activation instead of deferring them.
 
